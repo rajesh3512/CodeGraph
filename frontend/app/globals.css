@@ -1,8 +1,25 @@
+
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+
+  --background: #f5f4ef;
+  --surface: #ffffff;
+  --foreground: #111111;
+  --muted: #686868;
+  --border: #111111;
+  --accent: #e8ff55;
+  --accent-foreground: #111111;
+  --link: #2563eb;
+  --success: #16a34a;
+  --warning: #eab308;
+  --error: #dc2626;
+
+  --terminal: #111111;
+  --terminal-foreground: #f5f4ef;
+
+  --shadow-hard: 4px 4px 0 #111111;
 }
 
 @theme inline {
@@ -12,15 +29,58 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--background);
 }
 
 body {
+  min-height: 100vh;
+  margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+::selection {
+  color: var(--foreground);
+  background: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 3px;
+}
+
+.terminal-surface {
+  background: var(--terminal);
+  color: var(--terminal-foreground);
+  font-family: var(--font-geist-mono), monospace;
+}
+
+.brutal-border {
+  border: 2px solid var(--border);
+}
+
+.brutal-shadow {
+  box-shadow: var(--shadow-hard);
 }
