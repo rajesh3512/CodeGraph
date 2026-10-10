@@ -199,92 +199,79 @@ def build_repository_graph(repository_root: str) -> CodeGraph:
                     )
                 )
 
-    # ---------------------------------------------------------
-    # Call relationships
-    # ---------------------------------------------------------
 
-    call_data = extract_calls(str(full_path))
-
-    for call in call_data["calls"]:
-        caller_name = call["scope"]
-
-        if not caller_name:
+    # Call relationships: process every Python file after all nodes exist.
+    for file_data in files:
+        relative_path = Path(file_data["path"])
+        if relative_path.suffix.lower() != ".py":
             continue
 
-        caller_candidates = []
+        full_path = root / relative_path
+        call_data = extract_calls(str(full_path))
 
-        # Find the caller symbol in the current file.
-        for candidate in symbol_index.get(
-            caller_name,
-            [],
-        ):
-            if candidate["file"] == relative_path.as_posix():
-                caller_candidates.append(candidate)
+        for call in call_data["calls"]:
+            caller_name = call.get("scope")
+            if not caller_name:
+                continue
 
-        if not caller_candidates:
-            continue
+            caller_class = call.get("class")
+            caller_candidates = [
+                candidate
+                for candidate in symbol_index.get(caller_name, [])
+                if candidate["file"] == relative_path.as_posix()
+                and candidate["type"] in ("function", "method")
+                and candidate.get("class") == caller_class
+            ]
 
-        caller = caller_candidates[0]
+            if not caller_candidates:
+                continue
 
-        # Resolve the called symbol.
-        targets = resolve_call_name(
-            call["name"],
-            symbol_index,
-        )
-
-        # Only create edges for repository symbols.
-        for target in targets:
-            caller_id = None
+            caller = caller_candidates[0]
 
             if caller["type"] == "function":
                 caller_id = (
-                    f"function:{caller['file']}:"
-                    f"{caller['name']}"
+                    f"function:{caller['file']}:{caller['name']}"
                 )
-
-            elif caller["type"] == "class":
+            else:
                 caller_id = (
-                    f"class:{caller['file']}:"
-                    f"{caller['name']}"
+                    f"method:{caller['file']}:"
+                    f"{caller['class']}:{caller['name']}"
                 )
 
-            if not caller_id:
-                continue
-
-            target_id = None
-
-            if target["type"] == "function":
-                target_id = (
-                    f"function:{target['file']}:"
-                    f"{target['name']}"
-                )
-
-            elif target["type"] == "class":
-                target_id = (
-                    f"class:{target['file']}:"
-                    f"{target['name']}"
-                )
-
-            if not target_id:
-                continue
-
-            # Make sure both nodes exist.
-            if not graph.graph.has_node(caller_id):
-                continue
-
-            if not graph.graph.has_node(target_id):
-                continue
-
-            graph.add_edge(
-                GraphEdge(
-                    source=caller_id,
-                    target=target_id,
-                    type="calls",
-                    metadata={
-                        "line": call["line"],
-                        "call": call["name"],
-                    },
-                )
+            targets = resolve_call_name(
+                call["name"],
+                symbol_index,
+                current_class=caller_class,
             )
+
+            for target in targets:
+                if target["type"] == "function":
+                    target_id = (
+                        f"function:{target['file']}:{target['name']}"
+                    )
+                elif target["type"] == "method":
+                    target_id = (
+                        f"method:{target['file']}:"
+                        f"{target['class']}:{target['name']}"
+                    )
+                else:
+                    continue
+
+                if not graph.graph.has_node(caller_id):
+                    continue
+                if not graph.graph.has_node(target_id):
+                    continue
+
+                graph.add_edge(
+                    GraphEdge(
+                        source=caller_id,
+                        target=target_id,
+                        type="calls",
+                        metadata={
+                            "line": call["line"],
+                            "call": call["name"],
+                        },
+                    )
+                )
 
     return graph
