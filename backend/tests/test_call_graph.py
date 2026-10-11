@@ -56,3 +56,65 @@ def test_self_method_call_creates_method_edge(tmp_path):
         and edge["target"] == "method:worker.py:Worker:work"
         for edge in edges
     )
+
+
+def test_same_named_functions_in_different_modules_are_not_all_targets(tmp_path):
+    (tmp_path / "alpha.py").write_text(
+        "def process():\n"
+        "    return 'alpha'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "beta.py").write_text(
+        "def process():\n"
+        "    return 'beta'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "caller.py").write_text(
+        "from alpha import process\n"
+        "\n"
+        "def run():\n"
+        "    process()\n",
+        encoding="utf-8",
+    )
+
+    graph = build_repository_graph(str(tmp_path))
+    edges = call_edges(graph)
+
+    run_edges = [
+        edge
+        for edge in edges
+        if edge["source"] == "function:caller.py:run"
+    ]
+
+    assert [
+        edge["target"] for edge in run_edges
+    ] == ["function:alpha.py:process"]
+
+def test_unresolved_import_does_not_match_unrelated_function(tmp_path):
+    (tmp_path / "beta.py").write_text(
+        "def process():\n"
+        "    return 'beta'\n",
+        encoding="utf-8",
+    )
+
+    (tmp_path / "caller.py").write_text(
+        "from missing_module import process\n"
+        "\n"
+        "def run():\n"
+        "    process()\n",
+        encoding="utf-8",
+    )
+
+    graph = build_repository_graph(str(tmp_path))
+    edges = call_edges(graph)
+
+    run_edges = [
+        edge
+        for edge in edges
+        if edge["source"] == "function:caller.py:run"
+    ]
+
+    assert all(
+        edge["target"] != "function:beta.py:process"
+        for edge in run_edges
+    )

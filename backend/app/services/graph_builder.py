@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 
 from app.models.graph import GraphEdge, GraphNode
 from app.services.file_discovery import discover_source_files
@@ -14,6 +14,11 @@ from app.services.import_resolver import (
 )
 from app.services.call_extractor import extract_calls
 from app.services.call_resolver import (
+    build_symbol_index,
+    resolve_call_name,
+)
+from app.services.call_resolver import (
+    build_import_bindings,
     build_symbol_index,
     resolve_call_name,
 )
@@ -238,12 +243,16 @@ def build_repository_graph(repository_root: str) -> CodeGraph:
                     f"{caller['class']}:{caller['name']}"
                 )
 
+            caller_symbols = extract_symbols(str(full_path))
+            import_bindings = build_import_bindings(caller_symbols["imports"])
+
             targets = resolve_call_name(
                 call["name"],
                 symbol_index,
                 current_class=caller_class,
+                import_bindings=import_bindings,
+                module_map=module_map,
             )
-
             for target in targets:
                 if target["type"] == "function":
                     target_id = (
