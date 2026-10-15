@@ -1,4 +1,5 @@
 from pathlib import Path
+from app.services.symbol_extractor import extract_symbols
 
 
 BUILTIN_NAMES = {
@@ -59,99 +60,45 @@ BUILTIN_NAMES = {
 }
 
 
-def build_symbol_index(
-    repository_root: str,
-) -> dict[str, list[dict]]:
+def build_symbol_index(repository_root: str) -> dict[str, list[dict]]:
     root = Path(repository_root)
-
     index: dict[str, list[dict]] = {}
 
     for path in root.rglob("*.py"):
-        if ".git" in path.parts:
+        if ".git" in path.parts or ".venv" in path.parts:
             continue
 
-        relative = path.relative_to(root)
-        file_path = relative.as_posix()
+        relative_path = path.relative_to(root).as_posix()
+        symbols = extract_symbols(str(path))
 
-        source = path.read_text(
-            encoding="utf-8",
-            errors="replace",
-        )
+        for function in symbols["functions"]:
+            index.setdefault(function["name"], []).append({
+                "type": "function",
+                "name": function["name"],
+                "file": relative_path,
+                "line": function["line"],
+            })
 
-        lines = source.splitlines()
+        for class_data in symbols["classes"]:
+            class_name = class_data["name"]
 
-        current_class = None
+            index.setdefault(class_name, []).append({
+                "type": "class",
+                "name": class_name,
+                "file": relative_path,
+                "line": class_data["line"],
+            })
 
-        for line_number, line in enumerate(
-            lines,
-            start=1,
-        ):
-            stripped = line.strip()
-
-            # Detect class
-            if stripped.startswith("class "):
-                name = (
-                    stripped[6:]
-                    .split("(", 1)[0]
-                    .split(":", 1)[0]
-                    .strip()
-                )
-
-                current_class = name
-
-                index.setdefault(
-                    name,
-                    [],
-                ).append(
-                    {
-                        "type": "class",
-                        "name": name,
-                        "file": file_path,
-                        "line": line_number,
-                    }
-                )
-
-                continue
-
-            # Detect function
-            if stripped.startswith("def "):
-                name = (
-                    stripped[4:]
-                    .split("(", 1)[0]
-                    .strip()
-                )
-
-                # Method inside a class
-                if current_class:
-                    index.setdefault(
-                        name,
-                        [],
-                    ).append(
-                        {
-                            "type": "method",
-                            "name": name,
-                            "class": current_class,
-                            "file": file_path,
-                            "line": line_number,
-                        }
-                    )
-
-                # Top-level function
-                else:
-                    index.setdefault(
-                        name,
-                        [],
-                    ).append(
-                        {
-                            "type": "function",
-                            "name": name,
-                            "file": file_path,
-                            "line": line_number,
-                        }
-                    )
+            for method in class_data["methods"]:
+                index.setdefault(method["name"], []).append({
+                    "type": "method",
+                    "name": method["name"],
+                    "class": class_name,
+                    "file": relative_path,
+                    "line": method["line"],
+                })
 
     return index
-
 
 
 
