@@ -143,21 +143,9 @@ def test_top_level_function_after_class_is_indexed_as_function(tmp_path):
 
     assert len(standalone_nodes) == 1
 
-    def test_top_level_function_after_class_is_not_indexed_as_method(tmp_path):
-        (tmp_path / "example.py").write_text(
-            "class Worker:\n"
-            "    def work(self):\n"
-            "        return 1\n"
-            "\n"
-            "def standalone():\n"
-            "    return 2\n",
-            encoding="utf-8",
-        )
+    index = build_symbol_index(str(tmp_path))
+    standalone = index["standalone"]
 
-        index = build_symbol_index(str(tmp_path))
-
-        standalone = index["standalone"]
-
-        assert len(standalone) == 1
-        assert standalone[0]["type"] == "function"
-        assert standalone[0].get("class") is None
+    assert len(standalone) == 1
+    assert standalone[0]["type"] == "function"
+    assert standalone[0].get("class") is None
