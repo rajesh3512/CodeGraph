@@ -202,3 +202,85 @@ def test_module_qualified_call_resolves_to_imported_module(tmp_path):
     assert [
         edge["target"] for edge in run_edges
     ] == ["function:alpha.py:process"]
+def test_aliased_module_call_resolves_to_imported_function(tmp_path):
+    (tmp_path / "alpha.py").write_text(
+        "def process():\n"
+        "    return 'alpha'\n",
+        encoding="utf-8",
+    )
+
+    (tmp_path / "caller.py").write_text(
+        "import alpha as a\n"
+        "\n"
+        "def run():\n"
+        "    a.process()\n",
+        encoding="utf-8",
+    )
+
+    graph = build_repository_graph(str(tmp_path))
+    edges = call_edges(graph)
+
+    run_edges = [
+        edge for edge in edges
+        if edge["source"] == "function:caller.py:run"
+    ]
+
+    assert [
+        edge["target"] for edge in run_edges
+    ] == ["function:alpha.py:process"]
+
+
+def test_nested_module_call_resolves_to_imported_function(tmp_path):
+    services = tmp_path / "services"
+    services.mkdir()
+
+    (services / "__init__.py").write_text("", encoding="utf-8")
+    (services / "users.py").write_text(
+        "def get_user():\n"
+        "    return 'user'\n",
+        encoding="utf-8",
+    )
+
+    (tmp_path / "caller.py").write_text(
+        "import services.users\n"
+        "\n"
+        "def run():\n"
+        "    services.users.get_user()\n",
+        encoding="utf-8",
+    )
+
+    graph = build_repository_graph(str(tmp_path))
+    edges = call_edges(graph)
+
+    run_edges = [
+        edge for edge in edges
+        if edge["source"] == "function:caller.py:run"
+    ]
+
+    assert [
+        edge["target"] for edge in run_edges
+    ] == ["function:services/users.py:get_user"]
+
+
+def test_unknown_module_call_does_not_resolve_unrelated_function(tmp_path):
+    (tmp_path / "alpha.py").write_text(
+        "def process():\n"
+        "    return 'alpha'\n",
+        encoding="utf-8",
+    )
+
+    (tmp_path / "caller.py").write_text(
+        "def run():\n"
+        "    unknown.process()\n",
+        encoding="utf-8",
+    )
+
+    graph = build_repository_graph(str(tmp_path))
+    edges = call_edges(graph)
+
+    run_edges = [
+        edge for edge in edges
+        if edge["source"] == "function:caller.py:run"
+    ]
+
+    assert run_edges == []

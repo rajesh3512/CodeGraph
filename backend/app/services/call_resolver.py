@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 from app.services.symbol_extractor import extract_symbols
 
 
@@ -128,13 +128,14 @@ def resolve_call_name(
     bindings = import_bindings or {}
     modules = module_map or {}
 
-    # Resolve explicit imports, including module-qualified calls.
+
+    # Resolve explicitly imported names before global name-based matching.
     if "." not in call_name and call_name in bindings:
         qualified_name = bindings[call_name]
         module_name, _, symbol_name = qualified_name.rpartition(".")
         target_file = modules.get(module_name)
 
-        # Do not fall back to unrelated functions if the import is unresolved.
+        # Do not fall back to unrelated symbols if the import cannot resolve.
         if not target_file:
             return []
 
@@ -145,36 +146,58 @@ def resolve_call_name(
             and candidate["type"] in ("function", "method")
         ]
 
-    # Resolve calls such as alpha.process() only when alpha is an
-    # imported module or alias.
+    # Resolve module-qualified calls only when the prefix is imported.
     if "." in call_name:
-        prefix, _, symbol_name = call_name.partition(".")
+        prefix, _, suffix = call_name.partition(".")
+        imported_module = bindings.get(prefix)
 
-        if prefix in bindings:
-            module_name = bindings[prefix]
+        if not imported_module:
+            # Unknown receivers and unsupported attribute chains stay unresolved.
+            return []
 
-            # Only resolve a direct module-qualified function call for now.
-            # Avoid guessing receiver types for expressions like request.prepare().
-            if symbol_name and "." not in symbol_name:
-                target_file = modules.get(module_name)
+        module_name = None
+        symbol_name = None
 
-                if target_file:
-                    return [
-                        candidate
-                        for candidate in symbol_index.get(symbol_name, [])
-                        if candidate["file"] == target_file
-                        and candidate["type"] == "function"
-                    ]
+        # Handle `import services.users` followed by
+        # `services.users.get_user()`.
+        if call_name.startswith(imported_module + "."):
+            module_name = imported_module
+            symbol_name = call_name[len(imported_module) + 1:]
 
-        # Do not guess targets for attribute calls with unknown receivers.
+        # Handle `import alpha as a` followed by `a.process()`.
+        elif suffix and "." not in suffix:
+            module_name = imported_module
+            symbol_name = suffix
+
+        # Resolve only direct function calls in the imported module.
+        if (
+            module_name
+            and symbol_name
+            and "." not in symbol_name
+        ):
+            target_file = modules.get(module_name)
+
+            if not target_file:
+                return []
+
+            return [
+                candidate
+                for candidate in symbol_index.get(symbol_name, [])
+                if candidate["file"] == target_file
+                and candidate["type"] == "function"
+            ]
+
         return []
 
-    # Preserve name-based resolution for simple, unqualified calls.
+
+    # Preserve name-based resolution for simple, unqualified calls
+    # that do not have an explicit import binding.
     return [
         candidate
         for candidate in symbol_index.get(call_name, [])
         if candidate["type"] in ("function", "method")
     ]
+
 
 def build_import_bindings(
     import_statements: list[dict],
