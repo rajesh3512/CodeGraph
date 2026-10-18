@@ -12,7 +12,13 @@ from app.services.import_resolver import (
     resolve_import,
 )
 from app.services.call_extractor import extract_calls
+from pathlib import Path
 
+REPOSITORY_ROOT = (
+    Path(__file__).resolve().parent.parent
+    / "workspace"
+    / "repository"
+)
 
 app = FastAPI(
     title="CodeGraph API",
@@ -56,7 +62,7 @@ def clone_repository_endpoint(request: RepositoryRequest):
     try:
         result = clone_repository(
             request.repository_url,
-            "./workspace/repository",
+            str(REPOSITORY_ROOT),
         )
 
         return result
@@ -72,11 +78,11 @@ def clone_repository_endpoint(request: RepositoryRequest):
 def get_repository_files():
     try:
         files = discover_source_files(
-            "./workspace/repository"
+            str(REPOSITORY_ROOT)
         )
 
         return {
-            "repository": "workspace/repository",
+            "repository": str(REPOSITORY_ROOT),
             "file_count": len(files),
             "files": files,
         }
@@ -94,7 +100,7 @@ def parse_repository_file(
 ):
     try:
         result = parse_python_file(
-            f"./workspace/repository/{file}"
+            str(REPOSITORY_ROOT / file)
         )
 
         return result
@@ -112,7 +118,7 @@ def get_repository_symbols(
 ):
     try:
         result = extract_symbols(
-            f"./workspace/repository/{file}"
+            str(REPOSITORY_ROOT / file)
         )
 
         return result
@@ -128,7 +134,7 @@ def get_repository_symbols(
 def get_repository_graph():
     try:
         graph = build_repository_graph(
-            "./workspace/repository"
+            str(REPOSITORY_ROOT)
         )
 
         return {
@@ -150,7 +156,7 @@ def get_repository_imports(
     file: str = "src/requests/models.py"
 ):
     try:
-        repository_root = "./workspace/repository"
+        repository_root = str(REPOSITORY_ROOT)
 
         module_map = build_python_module_map(
             repository_root
@@ -192,8 +198,7 @@ def get_repository_calls(
     file: str = "src/requests/models.py"
 ):
     try:
-        repository_root = "./workspace/repository"
-
+        repository_root = str(REPOSITORY_ROOT)
         result = extract_calls(
             f"{repository_root}/{file}"
         )
