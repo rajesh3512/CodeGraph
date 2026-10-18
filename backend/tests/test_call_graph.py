@@ -174,3 +174,31 @@ def test_attribute_call_does_not_target_unrelated_same_named_methods(tmp_path):
     ]
 
     assert send_edges == []
+
+def test_module_qualified_call_resolves_to_imported_module(tmp_path):
+    (tmp_path / "alpha.py").write_text(
+        "def process():\n"
+        "    return 'alpha'\n",
+        encoding="utf-8",
+    )
+
+    (tmp_path / "caller.py").write_text(
+        "import alpha\n"
+        "\n"
+        "def run():\n"
+        "    alpha.process()\n",
+        encoding="utf-8",
+    )
+
+    graph = build_repository_graph(str(tmp_path))
+    edges = call_edges(graph)
+
+    run_edges = [
+        edge
+        for edge in edges
+        if edge["source"] == "function:caller.py:run"
+    ]
+
+    assert [
+        edge["target"] for edge in run_edges
+    ] == ["function:alpha.py:process"]

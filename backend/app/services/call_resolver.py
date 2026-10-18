@@ -128,7 +128,7 @@ def resolve_call_name(
     bindings = import_bindings or {}
     modules = module_map or {}
 
-    # Explicit imports must resolve to their actual source module.
+    # Resolve explicit imports, including module-qualified calls.
     if "." not in call_name and call_name in bindings:
         qualified_name = bindings[call_name]
         module_name, _, symbol_name = qualified_name.rpartition(".")
@@ -145,9 +145,28 @@ def resolve_call_name(
             and candidate["type"] in ("function", "method")
         ]
 
-    # Do not guess targets for attribute calls when the receiver's type
-    # cannot be determined. This avoids linking unrelated same-named methods.
+    # Resolve calls such as alpha.process() only when alpha is an
+    # imported module or alias.
     if "." in call_name:
+        prefix, _, symbol_name = call_name.partition(".")
+
+        if prefix in bindings:
+            module_name = bindings[prefix]
+
+            # Only resolve a direct module-qualified function call for now.
+            # Avoid guessing receiver types for expressions like request.prepare().
+            if symbol_name and "." not in symbol_name:
+                target_file = modules.get(module_name)
+
+                if target_file:
+                    return [
+                        candidate
+                        for candidate in symbol_index.get(symbol_name, [])
+                        if candidate["file"] == target_file
+                        and candidate["type"] == "function"
+                    ]
+
+        # Do not guess targets for attribute calls with unknown receivers.
         return []
 
     # Preserve name-based resolution for simple, unqualified calls.
