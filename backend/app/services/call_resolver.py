@@ -145,11 +145,15 @@ def resolve_call_name(
             and candidate["type"] in ("function", "method")
         ]
 
-    # Preserve name-based resolution for calls without an explicit import binding.
-    final_name = call_name.split(".")[-1]
+    # Do not guess targets for attribute calls when the receiver's type
+    # cannot be determined. This avoids linking unrelated same-named methods.
+    if "." in call_name:
+        return []
+
+    # Preserve name-based resolution for simple, unqualified calls.
     return [
         candidate
-        for candidate in symbol_index.get(final_name, [])
+        for candidate in symbol_index.get(call_name, [])
         if candidate["type"] in ("function", "method")
     ]
 

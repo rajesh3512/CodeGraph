@@ -149,3 +149,28 @@ def test_top_level_function_after_class_is_indexed_as_function(tmp_path):
     assert len(standalone) == 1
     assert standalone[0]["type"] == "function"
     assert standalone[0].get("class") is None
+def test_attribute_call_does_not_target_unrelated_same_named_methods(tmp_path):
+    (tmp_path / "requests.py").write_text(
+        "class Request:\n"
+        "    def prepare(self):\n"
+        "        return 1\n"
+        "\n"
+        "class PreparedRequest:\n"
+        "    def prepare(self):\n"
+        "        return 2\n"
+        "\n"
+        "def send(request):\n"
+        "    request.prepare()\n",
+        encoding="utf-8",
+    )
+
+    graph = build_repository_graph(str(tmp_path))
+    edges = call_edges(graph)
+
+    send_edges = [
+        edge
+        for edge in edges
+        if edge["source"] == "function:requests.py:send"
+    ]
+
+    assert send_edges == []
