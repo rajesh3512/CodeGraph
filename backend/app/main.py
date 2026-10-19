@@ -20,6 +20,19 @@ REPOSITORY_ROOT = (
     / "repository"
 )
 
+def resolve_repository_file(file: str) -> Path:
+    root = REPOSITORY_ROOT.resolve()
+    candidate = (root / file).resolve()
+
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        raise ValueError(
+            "File path must remain within the repository"
+        )
+
+    return candidate
+
 app = FastAPI(
     title="CodeGraph API",
     description="Repository intelligence and software engineering platform",
@@ -100,8 +113,9 @@ def parse_repository_file(
 ):
     try:
         result = parse_python_file(
-            str(REPOSITORY_ROOT / file)
+            str(resolve_repository_file(file))
         )
+        
 
         return result
 
@@ -118,7 +132,7 @@ def get_repository_symbols(
 ):
     try:
         result = extract_symbols(
-            str(REPOSITORY_ROOT / file)
+            str(resolve_repository_file(file))
         )
 
         return result
@@ -163,7 +177,7 @@ def get_repository_imports(
         )
 
         symbols = extract_symbols(
-            f"{repository_root}/{file}"
+            str(resolve_repository_file(file))
         )
 
         imports = []
@@ -200,7 +214,7 @@ def get_repository_calls(
     try:
         repository_root = str(REPOSITORY_ROOT)
         result = extract_calls(
-            f"{repository_root}/{file}"
+            str(resolve_repository_file(file))
         )
 
         return result
